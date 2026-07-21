@@ -1,7 +1,7 @@
 'use client'
 
 import { type FC } from 'react'
-import { Button, Card, Text, TokenWithNetworkIcon } from '@/components/ui'
+import { Button, Text, TokenWithNetworkIcon } from '@/components/ui'
 import { type SupportedNetworkIds, type TokenSymbolsList } from '@/components/ui'
 import { formatCryptoBalance, formatFiatBalance } from '@/lib/format'
 import { formatUnits } from 'viem'
@@ -20,7 +20,7 @@ export const PositionCard: FC<PositionCardProps> = ({ position, usdValue, onExit
   const amount = formatUnits(position.totalAssets, position.asset.decimals)
 
   return (
-    <Card variant="cardSecondary" className={classNames.positionCard}>
+    <div className={classNames.positionCard}>
       <div className={classNames.titleBlock}>
         <TokenWithNetworkIcon
           tokenName={position.asset.symbol as TokenSymbolsList}
@@ -44,7 +44,7 @@ export const PositionCard: FC<PositionCardProps> = ({ position, usdValue, onExit
 
       <div className={classNames.valueBlock}>
         <div className={classNames.amounts}>
-          <Text as="p" variant="p2semi" style={{ color: 'var(--earn-protocol-secondary-100)' }}>
+          <Text as="p" variant="p1semi" style={{ color: 'var(--earn-protocol-secondary-100)' }}>
             {formatCryptoBalance(amount)} {position.asset.symbol}
           </Text>
           {usdValue !== null ? (
@@ -61,6 +61,6 @@ export const PositionCard: FC<PositionCardProps> = ({ position, usdValue, onExit
           Exit
         </Button>
       </div>
-    </Card>
+    </div>
   )
 }

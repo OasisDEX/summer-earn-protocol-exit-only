@@ -1,14 +1,24 @@
 .positionCard {
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--general-space-16);
-  border: 1px solid var(--earn-protocol-neutral-85);
-  transition: border-color ease-out 0.2s;
+  width: 100%;
+  padding: var(--general-space-16) 0;
+  border-bottom: 1px solid var(--earn-protocol-neutral-70);
 }
 
-.positionCard:hover {
-  border-color: var(--earn-protocol-neutral-60);
+.positionCard:first-child {
+  padding-top: 0;
+}
+
+.positionCard:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.positionCard:not(:last-child):hover {
+  border-bottom-color: var(--earn-protocol-neutral-60);
 }
 
 .titleBlock {
@@ -47,12 +57,23 @@
 .valueBlock {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--general-space-16);
+  gap: var(--general-space-24);
 }
 
 .amounts {
   display: flex;
   flex-direction: column;
   gap: var(--general-space-4);
+  text-align: right;
+}
+
+@media (max-width: 530px) {
+  .positionCard {
+    flex-wrap: wrap;
+  }
+
+  .valueBlock {
+    width: 100%;
+    justify-content: space-between;
+  }
 }

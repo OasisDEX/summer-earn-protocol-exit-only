@@ -17,9 +17,11 @@
   display: flex;
   width: 100%;
   border-radius: var(--radius-large);
+  backdrop-filter: blur(20px) contrast(1.15)
 }
 
 @media (min-width: 531px) {
+
   .cardPrimary,
   .cardPrimaryColorfulBorder,
   .cardPrimarySmallPaddingsColorfulBorder,

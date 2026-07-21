@@ -19,6 +19,7 @@ import { ExitModal } from "@/components/ExitModal";
 import { FooterWrapper } from "@/components/FooterWrapper";
 import { FractalGlassBackground } from "@/components/FractalGlassBackground/FractalGlassBackground";
 import { PositionCard } from "@/components/PositionCard";
+import { PositionCardSkeleton } from "@/components/PositionCardSkeleton";
 import { StakedSumrCard } from "@/components/StakedSumrCard";
 import { UnstakeModal } from "@/components/UnstakeModal";
 import { CHAIN_LABELS } from "@/constants/chains";
@@ -32,6 +33,34 @@ import { type SumrStake } from "@/lib/staking";
 
 import styles from "@/app/page.module.css";
 import portfolioStyles from "./portfolio.module.css";
+
+// Mirrors the loaded positions section 1:1 (same Card + row + stats shape) so the page doesn't
+// shift layout once real data replaces it.
+const PositionsListSkeleton = () => (
+  <div
+    style={{
+      display: "flex",
+      flexDirection: "column",
+      gap: "var(--general-space-16)",
+    }}
+  >
+    <Card variant="cardSecondary" className={portfolioStyles.positionsGrid}>
+      <PositionCardSkeleton />
+      <PositionCardSkeleton />
+      <PositionCardSkeleton />
+    </Card>
+    <Card className={portfolioStyles.statsBlock}>
+      <div className={portfolioStyles.statsRow}>
+        <SkeletonLine width={110} height={16} />
+        <SkeletonLine width={70} height={20} />
+      </div>
+      <div className={portfolioStyles.statsRow}>
+        <SkeletonLine width={110} height={16} />
+        <SkeletonLine width={70} height={20} />
+      </div>
+    </Card>
+  </div>
+);
 
 const PortfolioContent = () => {
   const router = useRouter();
@@ -233,12 +262,7 @@ const PortfolioContent = () => {
 
           {/* Until mounted, render a stable loading shell so SSG HTML matches the first client
               render (viewedAddress is only known on the client). */}
-          {!mounted ? (
-            <>
-              <SkeletonLine height={96} width="100%" />
-              <SkeletonLine height={96} width="100%" />
-            </>
-          ) : null}
+          {!mounted ? <PositionsListSkeleton /> : null}
 
           {mounted && !viewedAddress ? (
             <Card
@@ -267,18 +291,7 @@ const PortfolioContent = () => {
             </Text>
           ) : null}
 
-          {mounted && viewedAddress && isLoading ? (
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "var(--general-space-8)",
-              }}
-            >
-              <SkeletonLine height={96} width="100%" />
-              <SkeletonLine height={96} width="100%" />
-            </div>
-          ) : null}
+          {mounted && viewedAddress && isLoading ? <PositionsListSkeleton /> : null}
 
           {mounted && viewedAddress && error ? (
             <Card style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -301,7 +314,7 @@ const PortfolioContent = () => {
                 ...fadeWhileRefetching(positionsRefetching),
               }}
             >
-              <div className={portfolioStyles.positionsGrid}>
+              <Card variant="cardSecondary" className={portfolioStyles.positionsGrid}>
                 {(showPaused
                   ? [...activePositions, ...pausedPositions]
                   : activePositions
@@ -313,7 +326,7 @@ const PortfolioContent = () => {
                     onExit={isOwnWallet ? setExitPosition : undefined}
                   />
                 ))}
-              </div>
+              </Card>
 
               <Card className={portfolioStyles.statsBlock}>
                 <div className={portfolioStyles.statsRow}>
