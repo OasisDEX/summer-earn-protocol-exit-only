@@ -1,34 +1,34 @@
-'use client'
+"use client";
 
-import { useEffect, useState } from 'react'
-import { Text } from '@/components/ui'
-import Image from 'next/image'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useAccount } from 'wagmi'
+import { useEffect, useState } from "react";
+import { Text } from "@/components/ui";
+import Image from "next/image";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useAccount } from "wagmi";
 
-import { ConnectButton } from '@/components/ConnectButton'
-import { FractalGlassBackground } from '@/components/FractalGlassBackground/FractalGlassBackground'
+import { ConnectButton } from "@/components/ConnectButton";
+import { FractalGlassBackground } from "@/components/FractalGlassBackground/FractalGlassBackground";
 
-import styles from './page.module.css'
+import styles from "./page.module.css";
 
 export default function LandingPage() {
-  const router = useRouter()
-  // status === 'connected' only — during wagmi's 'reconnecting' restore, isConnected is
+  const router = useRouter();
+  // status === 'connected' only - during wagmi's 'reconnecting' restore, isConnected is
   // already true from a stale stored address, which would bounce users with a locked wallet.
-  const { address, status: accountStatus } = useAccount()
+  const { address, status: accountStatus } = useAccount();
 
   // Hydration guard: the prerendered HTML never knows the wallet state.
-  const [mounted, setMounted] = useState(false)
+  const [mounted, setMounted] = useState(false);
 
-  useEffect(() => setMounted(true), [])
+  useEffect(() => setMounted(true), []);
 
-  // A connected wallet has nothing to do here — send it straight to its portfolio.
+  // A connected wallet has nothing to do here - send it straight to its portfolio.
   useEffect(() => {
-    if (mounted && accountStatus === 'connected') {
-      router.replace(`/portfolio?wallet=${address}`)
+    if (mounted && accountStatus === "connected") {
+      router.replace(`/portfolio?wallet=${address}`);
     }
-  }, [mounted, accountStatus, address, router])
+  }, [mounted, accountStatus, address, router]);
 
   return (
     <div className={styles.page}>
@@ -39,7 +39,13 @@ export default function LandingPage() {
         <div className={styles.heroVignette} />
         <div className={styles.heroContent}>
           <div className={styles.heroLogo}>
-            <Image src="/img/branding/dot-dark.svg" alt="Summer.fi" width={64} height={64} />
+            <Image
+              src="/img/branding/dot-dark.svg"
+              alt="Summer.fi"
+              width={64}
+              height={64}
+              style={{ width: "auto", height: "auto" }}
+            />
           </div>
           <Text as="h3" variant="h3">
             Summer.fi is winding down.
@@ -48,10 +54,10 @@ export default function LandingPage() {
             as="p"
             variant="p1"
             style={{
-              textShadow: '1px 1px 0 rgba(0,0,0,0.2)',
+              textShadow: "1px 1px 0 rgba(0,0,0,0.2)",
             }}
           >
-            Read more on the{' '}
+            Read more on the{" "}
             <Link href="#" className={styles.blogLink}>
               blog post
             </Link>
@@ -65,11 +71,15 @@ export default function LandingPage() {
           </div>
         </div>
         <div className={styles.heroFooter}>
-          <Text as="p" variant="p3" style={{ color: 'var(--earn-protocol-secondary-60)' }}>
+          <Text
+            as="p"
+            variant="p3"
+            style={{ color: "var(--earn-protocol-secondary-60)" }}
+          >
             Summer.fi 2026
           </Text>
         </div>
       </section>
     </div>
-  )
+  );
 }

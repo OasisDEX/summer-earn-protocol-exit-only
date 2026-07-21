@@ -1,76 +1,101 @@
-import { type Address, erc20Abi } from 'viem'
+import { type Address, erc20Abi } from "viem";
 
-import { fleetCommanderAbi, harborCommandAbi, stakingRewardsManagerAbi } from '@/constants/abis'
-import { CORE_ADDRESSES, EXTRA_FLEETS } from '@/constants/addresses'
-import { SUPPORTED_CHAIN_IDS } from '@/constants/chains'
-import { getPublicClient } from '@/lib/clients'
-import { humanizeFleetName } from '@/lib/fleet-name'
+import {
+  fleetCommanderAbi,
+  harborCommandAbi,
+  stakingRewardsManagerAbi,
+} from "@/constants/abis";
+import { CORE_ADDRESSES, EXTRA_FLEETS } from "@/constants/addresses";
+import { SUPPORTED_CHAIN_IDS } from "@/constants/chains";
+import { getPublicClient } from "@/lib/clients";
+import { humanizeFleetName } from "@/lib/fleet-name";
 
 export interface FleetPosition {
-  chainId: number
-  fleetAddress: Address
-  fleetName: string
-  displayName: string
-  asset: { address: Address; symbol: string; decimals: number }
-  walletShares: bigint
-  stakedShares: bigint
-  totalShares: bigint
-  totalAssets: bigint
-  stakingRewardsManager: Address | null
+  chainId: number;
+  fleetAddress: Address;
+  fleetName: string;
+  displayName: string;
+  asset: { address: Address; symbol: string; decimals: number };
+  walletShares: bigint;
+  stakedShares: bigint;
+  totalShares: bigint;
+  totalAssets: bigint;
+  stakingRewardsManager: Address | null;
+  paused: boolean;
 }
 
-const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 /** Every fleet on the chain: on-chain registry + the hardcoded escape hatch. */
-export const getFleetAddresses = async (chainId: number): Promise<Address[]> => {
-  const client = getPublicClient(chainId)
+export const getFleetAddresses = async (
+  chainId: number,
+): Promise<Address[]> => {
+  const client = getPublicClient(chainId);
   const active = await client.readContract({
     address: CORE_ADDRESSES[chainId].harborCommand,
     abi: harborCommandAbi,
-    functionName: 'getActiveFleetCommanders',
-  })
+    functionName: "getActiveFleetCommanders",
+  });
 
-  return [...new Set<Address>([...active, ...EXTRA_FLEETS[chainId]])]
-}
+  return [...new Set<Address>([...active, ...EXTRA_FLEETS[chainId]])];
+};
 
 export const getPositionsForChain = async (
   chainId: number,
   user: Address,
 ): Promise<FleetPosition[]> => {
-  const client = getPublicClient(chainId)
-  const fleets = await getFleetAddresses(chainId)
+  const client = getPublicClient(chainId);
+  const fleets = await getFleetAddresses(chainId);
 
-  if (fleets.length === 0) return []
+  if (fleets.length === 0) return [];
 
   // Round 1: wallet shares + staking manager address, 2 reads per fleet, one multicall.
   const balanceAndConfig = await client.multicall({
     contracts: fleets.flatMap((fleet) => [
-      { address: fleet, abi: fleetCommanderAbi, functionName: 'balanceOf', args: [user] } as const,
-      { address: fleet, abi: fleetCommanderAbi, functionName: 'config' } as const,
+      {
+        address: fleet,
+        abi: fleetCommanderAbi,
+        functionName: "balanceOf",
+        args: [user],
+      } as const,
+      {
+        address: fleet,
+        abi: fleetCommanderAbi,
+        functionName: "config",
+      } as const,
     ]),
     allowFailure: true,
-  })
+  });
 
   const perFleet = fleets.map((fleet, index) => {
-    const balanceConfigBase = index * 2
-    const balanceResult = balanceAndConfig[balanceConfigBase]
-    const configResult = balanceAndConfig[balanceConfigBase + 1]
-    const walletShares = balanceResult.status === 'success' ? (balanceResult.result as bigint) : 0n
+    const balanceConfigBase = index * 2;
+    const balanceResult = balanceAndConfig[balanceConfigBase];
+    const configResult = balanceAndConfig[balanceConfigBase + 1];
+    const walletShares =
+      balanceResult.status === "success"
+        ? (balanceResult.result as bigint)
+        : 0n;
     // config() returns a 5-tuple; the 5th entry is the staking rewards manager.
     const stakingRewardsManager =
-      configResult.status === 'success'
+      configResult.status === "success"
         ? ((
-            configResult.result as readonly [Address, bigint, bigint, bigint, Address]
+            configResult.result as readonly [
+              Address,
+              bigint,
+              bigint,
+              bigint,
+              Address,
+            ]
           )[4] as Address)
-        : (ZERO_ADDRESS as Address)
+        : (ZERO_ADDRESS as Address);
 
-    return { fleet, walletShares, stakingRewardsManager }
-  })
+    return { fleet, walletShares, stakingRewardsManager };
+  });
 
   // Round 2: staked shares for fleets that have a staking module.
   const withStaking = perFleet.filter(
     (entry) => entry.stakingRewardsManager.toLowerCase() !== ZERO_ADDRESS,
-  )
+  );
   const stakedResults =
     withStaking.length > 0
       ? await client.multicall({
@@ -79,101 +104,127 @@ export const getPositionsForChain = async (
               ({
                 address: entry.stakingRewardsManager,
                 abi: stakingRewardsManagerAbi,
-                functionName: 'balanceOf',
+                functionName: "balanceOf",
                 args: [user],
               }) as const,
           ),
           allowFailure: true,
         })
-      : []
+      : [];
 
   const stakedByFleet = new Map<Address, bigint>(
     withStaking.map((entry, index) => [
       entry.fleet,
-      stakedResults[index]?.status === 'success' ? (stakedResults[index].result as bigint) : 0n,
+      stakedResults[index]?.status === "success"
+        ? (stakedResults[index].result as bigint)
+        : 0n,
     ]),
-  )
+  );
 
   const candidates = perFleet
     .map((entry) => ({
       ...entry,
       stakedShares: stakedByFleet.get(entry.fleet) ?? 0n,
     }))
-    .filter((entry) => entry.walletShares + entry.stakedShares > 0n)
+    .filter((entry) => entry.walletShares + entry.stakedShares > 0n);
 
-  if (candidates.length === 0) return []
+  if (candidates.length === 0) return [];
 
   // Round 3: metadata + share->asset conversion for actual positions only.
   // allowFailure so one broken/decommissioned fleet (e.g. an EXTRA_FLEETS entry that reverts on a
-  // view) drops out of the results instead of hiding every position on the chain — this is a
+  // view) drops out of the results instead of hiding every position on the chain - this is a
   // wind-down safety app, so a single bad fleet must never mask a user's other exitable positions.
   const metadata = await client.multicall({
     contracts: candidates.flatMap((entry) => {
-      const totalShares = entry.walletShares + entry.stakedShares
+      const totalShares = entry.walletShares + entry.stakedShares;
 
       return [
-        { address: entry.fleet, abi: fleetCommanderAbi, functionName: 'name' } as const,
-        { address: entry.fleet, abi: fleetCommanderAbi, functionName: 'asset' } as const,
         {
           address: entry.fleet,
           abi: fleetCommanderAbi,
-          functionName: 'convertToAssets',
+          functionName: "name",
+        } as const,
+        {
+          address: entry.fleet,
+          abi: fleetCommanderAbi,
+          functionName: "asset",
+        } as const,
+        {
+          address: entry.fleet,
+          abi: fleetCommanderAbi,
+          functionName: "convertToAssets",
           args: [totalShares],
         } as const,
-      ]
+        {
+          address: entry.fleet,
+          abi: fleetCommanderAbi,
+          functionName: "paused",
+        } as const,
+      ];
     }),
     allowFailure: true,
-  })
+  });
 
   const assetAddresses = candidates.map((entry, index) => {
-    const metadataBase = index * 3
-    const assetResult = metadata[metadataBase + 1] // name, asset, convertToAssets → asset is slot +1
+    const metadataBase = index * 4;
+    const assetResult = metadata[metadataBase + 1]; // name, asset, convertToAssets, paused → asset is slot +1
 
-    return assetResult.status === 'success' ? (assetResult.result as Address) : null
-  })
+    return assetResult.status === "success"
+      ? (assetResult.result as Address)
+      : null;
+  });
 
   const assetMetadata = await client.multicall({
     contracts: assetAddresses.flatMap((assetAddress) =>
       assetAddress === null
         ? []
         : [
-            { address: assetAddress, abi: erc20Abi, functionName: 'symbol' } as const,
-            { address: assetAddress, abi: erc20Abi, functionName: 'decimals' } as const,
+            {
+              address: assetAddress,
+              abi: erc20Abi,
+              functionName: "symbol",
+            } as const,
+            {
+              address: assetAddress,
+              abi: erc20Abi,
+              functionName: "decimals",
+            } as const,
           ],
     ),
     allowFailure: true,
-  })
+  });
 
   // assetMetadata is packed only for candidates whose asset() succeeded; walk it with a cursor
   // that advances 2 slots per resolved asset, in the same candidate order.
-  let assetMetadataCursor = 0
+  let assetMetadataCursor = 0;
 
   return candidates
     .map((entry, index) => {
-      const metadataBase = index * 3
-      const nameResult = metadata[metadataBase]
-      const assetAddress = assetAddresses[index]
-      const totalAssetsResult = metadata[metadataBase + 2]
+      const metadataBase = index * 4;
+      const nameResult = metadata[metadataBase];
+      const assetAddress = assetAddresses[index];
+      const totalAssetsResult = metadata[metadataBase + 2];
+      const pausedResult = metadata[metadataBase + 3];
 
       // This candidate's asset() reverted: no slots were emitted for it in assetMetadata.
-      if (assetAddress === null) return null
+      if (assetAddress === null) return null;
 
-      const symbolResult = assetMetadata[assetMetadataCursor]
-      const decimalsResult = assetMetadata[assetMetadataCursor + 1]
+      const symbolResult = assetMetadata[assetMetadataCursor];
+      const decimalsResult = assetMetadata[assetMetadataCursor + 1];
 
-      assetMetadataCursor += 2
+      assetMetadataCursor += 2;
 
       // Drop the fleet if any read it needs to be exitable/displayable failed.
       if (
-        nameResult.status !== 'success' ||
-        totalAssetsResult.status !== 'success' ||
-        symbolResult.status !== 'success' ||
-        decimalsResult.status !== 'success'
+        nameResult.status !== "success" ||
+        totalAssetsResult.status !== "success" ||
+        symbolResult.status !== "success" ||
+        decimalsResult.status !== "success"
       ) {
-        return null
+        return null;
       }
 
-      const fleetName = nameResult.result as string
+      const fleetName = nameResult.result as string;
 
       return {
         chainId,
@@ -193,10 +244,15 @@ export const getPositionsForChain = async (
           entry.stakingRewardsManager.toLowerCase() === ZERO_ADDRESS
             ? null
             : entry.stakingRewardsManager,
-      }
+        // Fail safe to "not paused" on a bad read rather than hiding an otherwise exitable position.
+        paused:
+          pausedResult.status === "success"
+            ? (pausedResult.result as boolean)
+            : false,
+      };
     })
-    .filter((position): position is FleetPosition => position !== null)
-}
+    .filter((position): position is FleetPosition => position !== null);
+};
 
 /** All chains in parallel; a failing RPC never hides the other chains' positions. */
 export const getAllPositions = async (
@@ -204,15 +260,15 @@ export const getAllPositions = async (
 ): Promise<{ positions: FleetPosition[]; failedChainIds: number[] }> => {
   const results = await Promise.allSettled(
     SUPPORTED_CHAIN_IDS.map((chainId) => getPositionsForChain(chainId, user)),
-  )
+  );
 
-  const positions: FleetPosition[] = []
-  const failedChainIds: number[] = []
+  const positions: FleetPosition[] = [];
+  const failedChainIds: number[] = [];
 
   results.forEach((result, index) => {
-    if (result.status === 'fulfilled') positions.push(...result.value)
-    else failedChainIds.push(SUPPORTED_CHAIN_IDS[index])
-  })
+    if (result.status === "fulfilled") positions.push(...result.value);
+    else failedChainIds.push(SUPPORTED_CHAIN_IDS[index]);
+  });
 
-  return { positions, failedChainIds }
-}
+  return { positions, failedChainIds };
+};

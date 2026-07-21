@@ -1,0 +1,69 @@
+.positionsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--general-space-8);
+}
+
+@media (max-width: 768px) {
+  .positionsGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pausedToggleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--general-space-8);
+}
+
+.toggleSwitch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 36px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--earn-protocol-neutral-70);
+  cursor: pointer;
+  transition: background-color ease-out 0.15s;
+}
+
+.toggleSwitch[data-checked='true'] {
+  background: var(--earn-protocol-primary-100);
+}
+
+.toggleSwitch input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.toggleThumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--earn-protocol-secondary-100);
+  transition: transform ease-out 0.15s;
+}
+
+.toggleSwitch[data-checked='true'] .toggleThumb {
+  transform: translateX(16px);
+}
+
+.statsBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--general-space-8);
+}
+
+.statsRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}

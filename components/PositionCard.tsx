@@ -28,9 +28,12 @@ export const PositionCard: FC<PositionCardProps> = ({ position, usdValue, onExit
           variant="medium"
         />
         <div className={classNames.titleText}>
-          <Text as="p" variant="p1semi" style={{ color: 'var(--earn-protocol-secondary-100)' }}>
-            {position.displayName || position.fleetName}
-          </Text>
+          <div className={classNames.nameRow}>
+            <Text as="p" variant="p1semi" style={{ color: 'var(--earn-protocol-secondary-100)' }}>
+              {position.displayName || position.fleetName}
+            </Text>
+            {position.paused ? <span className={classNames.pausedTag}>PAUSED</span> : null}
+          </div>
           {position.stakedShares > 0n ? (
             <Text as="p" variant="p3" style={{ color: 'var(--earn-protocol-secondary-60)' }}>
               Includes staked shares
@@ -41,7 +44,7 @@ export const PositionCard: FC<PositionCardProps> = ({ position, usdValue, onExit
 
       <div className={classNames.valueBlock}>
         <div className={classNames.amounts}>
-          <Text as="p" variant="p1semi" style={{ color: 'var(--earn-protocol-secondary-100)' }}>
+          <Text as="p" variant="p2semi" style={{ color: 'var(--earn-protocol-secondary-100)' }}>
             {formatCryptoBalance(amount)} {position.asset.symbol}
           </Text>
           {usdValue !== null ? (
@@ -50,7 +53,11 @@ export const PositionCard: FC<PositionCardProps> = ({ position, usdValue, onExit
             </Text>
           ) : null}
         </div>
-        <Button variant="primarySmall" disabled={!onExit} onClick={() => onExit?.(position)}>
+        <Button
+          variant="primarySmall"
+          disabled={!onExit || position.paused}
+          onClick={() => onExit?.(position)}
+        >
           Exit
         </Button>
       </div>

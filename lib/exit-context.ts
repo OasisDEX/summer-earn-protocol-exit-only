@@ -1,75 +1,75 @@
-import { type Address } from 'viem'
+import { type Address } from "viem";
 
-import { fleetCommanderAbi, stakingRewardsManagerAbi } from '@/constants/abis'
-import { CORE_ADDRESSES } from '@/constants/addresses'
-import { getPublicClient } from '@/lib/clients'
-import { type FleetPosition } from '@/lib/positions'
+import { fleetCommanderAbi, stakingRewardsManagerAbi } from "@/constants/abis";
+import { CORE_ADDRESSES } from "@/constants/addresses";
+import { getPublicClient } from "@/lib/clients";
+import { type FleetPosition } from "@/lib/positions";
 
 export interface ExitContext {
-  allowance: bigint
-  paused: boolean
-  hasClaimableRewards: boolean
+  allowance: bigint;
+  paused: boolean;
+  hasClaimableRewards: boolean;
 }
 
 export const readExitContext = async (
   position: FleetPosition,
   user: Address,
 ): Promise<ExitContext> => {
-  const client = getPublicClient(position.chainId)
-  const { admiralsQuarters } = CORE_ADDRESSES[position.chainId]
+  const client = getPublicClient(position.chainId);
+  const { admiralsQuarters } = CORE_ADDRESSES[position.chainId];
 
   const [allowance, paused] = await Promise.all([
     client.readContract({
       address: position.fleetAddress,
       abi: fleetCommanderAbi,
-      functionName: 'allowance',
+      functionName: "allowance",
       args: [user, admiralsQuarters],
     }),
     client
       .readContract({
         address: position.fleetAddress,
         abi: fleetCommanderAbi,
-        functionName: 'paused',
+        functionName: "paused",
       })
       .catch(() => false),
-  ])
+  ]);
 
-  let hasClaimableRewards = false
+  let hasClaimableRewards = false;
 
   if (position.stakingRewardsManager) {
     try {
-      const rewardsManager = position.stakingRewardsManager
+      const rewardsManager = position.stakingRewardsManager;
       const count = await client.readContract({
         address: rewardsManager,
         abi: stakingRewardsManagerAbi,
-        functionName: 'rewardTokensLength',
-      })
+        functionName: "rewardTokensLength",
+      });
       const rewardTokens = await Promise.all(
         Array.from({ length: Number(count) }, (_, index) =>
           client.readContract({
             address: rewardsManager,
             abi: stakingRewardsManagerAbi,
-            functionName: 'rewardTokens',
+            functionName: "rewardTokens",
             args: [BigInt(index)],
           }),
         ),
-      )
+      );
       const earned = await Promise.all(
         rewardTokens.map((token) =>
           client.readContract({
             address: rewardsManager,
             abi: stakingRewardsManagerAbi,
-            functionName: 'earned',
+            functionName: "earned",
             args: [user, token],
           }),
         ),
-      )
+      );
 
-      hasClaimableRewards = earned.some((amount) => amount > 0n)
+      hasClaimableRewards = earned.some((amount) => amount > 0n);
     } catch {
-      hasClaimableRewards = false // cosmetic — never block the exit on a rewards read failure
+      hasClaimableRewards = false; // cosmetic - never block the exit on a rewards read failure
     }
   }
 
-  return { allowance, paused, hasClaimableRewards }
-}
+  return { allowance, paused, hasClaimableRewards };
+};
