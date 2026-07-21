@@ -1,0 +1,36 @@
+{
+  "name": "@summerfi/earn-exit",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3817",
+    "build": "next build",
+    "serve": "npx serve out",
+    "test": "jest --passWithNoTests",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.51.1",
+    "bignumber.js": "^9.3.0",
+    "clsx": "^2.1.1",
+    "next": "16.2.4",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "sanitize.css": "13.0.0",
+    "viem": "2.47.1",
+    "wagmi": "2.10.9"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.14.2",
+    "@types/react": "19.2.3",
+    "@types/react-dom": "19.2.2",
+    "eslint": "^9.39.0",
+    "eslint-config-next": "16.2.4",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "ts-jest": "^29.1.2",
+    "typescript": "^5.4.5"
+  }
+}
