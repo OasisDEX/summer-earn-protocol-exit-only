@@ -19,7 +19,7 @@
     "react-dom": "19.2.3",
     "sanitize.css": "13.0.0",
     "viem": "2.47.1",
-    "wagmi": "2.10.9"
+    "wagmi": "3.7.3"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",
