@@ -1,152 +1,119 @@
 # Summer.fi Exit App
 
-Static exit-only app. Build: `pnpm turbo build --filter=@summerfi/earn-exit...` → deploy the
-`apps/earn-exit/out/` directory to any static host (S3+CloudFront, Cloudflare Pages, nginx…).
+A simple, self-contained web app that lets Summer.fi depositors **withdraw their funds** and
+**unstake their SUMR** during the protocol wind-down. Connect a wallet, see your positions, exit.
 
-- Env (build-time, optional): `NEXT_PUBLIC_RPC_URL_{MAINNET,BASE,ARBITRUM,SONIC,HYPERLIQUID}`,
-  `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`. Defaults are public RPCs - the app works with none set.
-- Changing an RPC URL requires a rebuild (values are inlined into the static bundle).
-- Routing: real HTML files are emitted per route; if the host does not map `/portfolio` to
-  `portfolio.html`, set `trailingSlash: true` in `next.config.ts` and rebuild (emits
-  `portfolio/index.html`).
-- Contract addresses live in `constants/addresses.ts`. `HarborCommand` comes from
-  `sdk/armada-protocol-common/src/deployments/sumr.json`. **`AdmiralsQuarters` does NOT** - the
-  `sumr.json` AQ addresses are stale on all five chains (they no longer hold
-  `ADMIRALS_QUARTERS_ROLE`, so staked exits revert `CallerNotAdmiralsQuarters`). The AQ addresses
-  here are the current role-holding deployments, found via `ProtocolAccessManager` `RoleGranted`
-  logs and verified with `hasAdmiralsQuartersRole()` on every fleet's rewards manager (see the
-  live-verification section below). If the deployment moves again, re-run that discovery.
-- If a fleet is decommissioned during wind-down, add its address to `EXTRA_FLEETS` so remaining
-  holders still see it.
+It talks directly to the blockchain — there is no backend, no database, and no account to create.
+The whole app builds into a folder of static files you can host anywhere.
 
-Known limitations (accepted):
+- **Supported chains:** Ethereum, Base, Arbitrum, Sonic, Hyperliquid
+- **Works out of the box** — no configuration or API keys required
 
-- USD values are approximations ($1 stables + mainnet Chainlink ETH/EUR); token amounts are exact.
-- Wallets holding only unclaimed rewards (zero shares) are not listed - they have no position to
-  exit; rewards for listed positions are claimed automatically (staked) or via a Claim step.
-- A fleet whose buffer/arks cannot serve a full exit at that moment reverts; retrying later works.
-- SUMR staking has **no USD value** shown (SUMR has no Chainlink feed and pricing it would need an
-  external API - a dependency the app deliberately avoids); the SUMR amount is exact.
+---
 
-## SUMR governance-token staking (unstake-only)
+## Run it on your own computer
 
-Below the protocol positions, the portfolio also surfaces **staked SUMR** (the governance token) so
-holders can unstake during the wind-down. This is the V2 `SummerStaking` system and is **completely
-separate** from vault-share staking (which the fleet exit already unwinds via
-`unstakeAndWithdrawAssets`).
+You only need [Node.js](https://nodejs.org) (version 20 or newer). Installing it also gives you
+`npm`, used below.
 
-- **Base only** - SUMR staking is deployed on a single chain (`SUMR_STAKING` in
-  `constants/addresses.ts`). The `SummerStaking` and SUMR-token addresses come from the SDK
-  deployment config (`sumr.json` `govV2`); the stSUMR staked-receipt token is resolved on-chain via
-  `STAKED_SUMMER_TOKEN()` (it is the token approved before unstaking).
-- **Per stake** - a user holds N independent stakes, each with its own lockup and amount. Unstaking
-  is `unstakeLockup(stakeIndex, amount)`, one stake at a time: `SummerStaking` swap-and-pops emptied
-  stakes, so indices shift - the modal reloads after any executed tx to re-read fresh indices.
-- **Early-unstake penalty** - while a stake is locked and `penaltyEnabled()` is true, unstaking
-  applies a penalty (2% floor near expiry, ramping toward 20% for long locks). The exact penalty %
-  and net SUMR received are read on-chain (`calculatePenaltyPercentage` / `calculatePenalty`) and
-  shown before the user confirms.
-- **Steps** - `[approve stSUMR (if needed)] → unstakeLockup`. Unstaking does not auto-claim, so a
-  "Claim" action is offered: a **self-claim** `getReward(rewardToken)` per reward token with an
-  earned balance. (Not `getRewardFor(account, token)` - that is the on-behalf/keeper path and
-  reverts with a caller-not-authorized error when a user calls it for themselves.)
+1. **Download the code** — click the green *Code* button on GitHub → *Download ZIP*, then unzip it.
+   (Or, if you use Git: `git clone <repo-url>`.)
+2. **Open a terminal** in the project folder and run:
 
-Smoke-test the read path with `scripts/check-staked-sumr.ts` (below).
+   ```bash
+   npm install       # download the app's building blocks (one time)
+   npm run dev       # start the app
+   ```
 
-## SUMR staking live-chain verification (2026-07-20, Base fork)
+3. **Open your browser** to **http://localhost:3817**.
 
-Verified the `SummerStaking` read path against the Tenderly Base fork:
+To stop the app, press `Ctrl+C` in the terminal.
 
-- `SummerStaking` (`0xcA2e…15b4`) is live; `SUMMER_TOKEN()` returns `0x194f…1624` - an **exact match**
-  for the hardcoded `SUMR_STAKING.sumrToken`.
-- `STAKED_SUMMER_TOKEN()` resolves to `0x7cC4…0D1c` (symbol `stSUMR`) - the token approved before
-  unstaking.
-- `penaltyEnabled()` is `true`; reward tokens = `[SUMR]`.
-- Full per-user reads across real stakers confirmed: multi-stake accounts (30+ stakes) parse
-  correctly, zero-amount stakes are filtered, `isLocked` is derived correctly, and the penalty
-  percentage scaling (`/1e16`) produces sane values (2% near expiry → ~19% for 3-year locks) with
-  matching absolute penalty amounts.
-- **Write path executed end-to-end** against the fork (impersonated stakers), driving the real
-  `getStakedSumr` → `buildUnstakePlan` code:
-  - Unlocked stake: `unstakeLockup` + self-claim `getReward` both succeed; the full staked amount
-    plus claimed rewards land in the wallet, no penalty.
-  - Locked stake: `approve stSUMR → unstakeLockup` succeeds and the on-chain penalty deduction
-    matches the UI's predicted "you'll receive" figure to the token (e.g. 202,356 SUMR unstaked at
-    a 16.73% penalty returned ≈168,506 SUMR).
-  - Unstaking a stake **reorganizes the array (swap-and-pop): indices shift**, so the app must
-    re-read between unstakes - which it does (the modal reloads on any executed tx). Verified by
-    unstaking all 5 stakes of one wallet in a loop that re-reads each round; a batch built against
-    stale indices would target the wrong stakes.
+---
 
-## Test-only wallet shim (dev/fork use only)
+## Put it online (deploy)
 
-`app/layout.tsx` conditionally loads `public/test-wallet-shim.js` when the build/dev-time env var
-`NEXT_PUBLIC_TEST_WALLET` is set (see `NEXT_PUBLIC_TEST_WALLET_RPC` /
-`NEXT_PUBLIC_TEST_WALLET_CHAIN_ID` for the account/RPC it injects). It exists purely to make the
-anvil-fork rehearsal (see the phase-5 plan, Task 5.3) drivable without a browser extension wallet:
-with the env var set it injects a raw-private-key signer wired to a local RPC (e.g.
-`http://127.0.0.1:8545`) as an EIP-1193 provider, so the Connect flow can sign against a fork using
-anvil's published test key.
+The app is a set of plain static files, so it runs on almost any host. Pick whichever is easiest
+for you — the first two are the most beginner-friendly and free.
 
-- **Inert in production**: with `NEXT_PUBLIC_TEST_WALLET` unset (the default - do not set it in any
-  real deployment), `layout.tsx` never evaluates the injection and the script is never referenced
-  from the emitted HTML. Verified for this build: `out/index.html` and `out/portfolio.html` contain
-  no `<script>` reference to `test-wallet-shim.js`, even though the file itself is copied into
-  `out/` as a static asset because everything under `public/` is copied verbatim by Next's static
-  export - that copy is harmless since nothing loads it.
-- **To use it against a fork**: start `anvil --fork-url <chain RPC> --chain-id <id> --port 8545`,
-  then run the dev server with
-  `NEXT_PUBLIC_TEST_WALLET=1 NEXT_PUBLIC_TEST_WALLET_RPC=http://127.0.0.1:8545 NEXT_PUBLIC_TEST_WALLET_CHAIN_ID=<id> pnpm --filter @summerfi/earn-exit dev`.
+### Vercel or Netlify (easiest — no terminal needed)
 
-## Live-chain verification (2026-07-16)
+1. Push this code to your own GitHub account (or use *Download ZIP* → upload).
+2. Sign in at [vercel.com](https://vercel.com) or [netlify.com](https://netlify.com) and choose
+   **Import / Add new project**, then pick your repository.
+3. Both auto-detect the settings below. Click **Deploy** — you get a live URL in about a minute.
 
-Addresses in `constants/addresses.ts` were re-verified against deployed contracts on all five chains
-as part of Phase 5:
+### Cloudflare Pages / GitHub Pages / any other host
 
-- `HarborCommand`: `sumr.json` → `constants/addresses.ts` **exact match**, all 5 chains; and
-  `getActiveFleetCommanders()` returns a non-empty fleet list on all 5 chains (Ethereum: 7, Base: 3,
-  Arbitrum: 3, Sonic: 1, Hyperliquid: 2 active fleets at verification time).
-- `AdmiralsQuarters`: **`sumr.json` addresses are stale on all 5 chains** - verified on-chain that
-  they no longer hold `ADMIRALS_QUARTERS_ROLE` on any fleet's `StakingRewardsManager`
-  (`hasAdmiralsQuartersRole()` → `false` everywhere), so a staked exit through them reverts
-  `CallerNotAdmiralsQuarters` (`0x8e866cef`). `constants/addresses.ts` instead uses the current
-  role-holding AQ per chain (mainnet `0xD03bD9…22Dba`, base `0x4e9207…313a`, arbitrum
-  `0x1db04f…1219`, sonic `0xa514a9…4410`, hyperliquid `0x3D4AE5…32a5`), each confirmed:
-  `hasAdmiralsQuartersRole()` → `true` on **every** fleet SRM on its chain, and all 4 exit-path
-  selectors (`exitFleet`, `withdrawTokens`, `unstakeAndWithdrawAssets`, `multicall`) present in
-  deployed bytecode. A full staked exit was executed end-to-end against a mainnet fork through the
-  UI to confirm.
-- `FleetCommander` (ERC-4626 share token) ABI selectors used by the app (`approve`, `balanceOf`,
-  `convertToAssets`, `asset`, `name`, `decimals`, `paused`, `allowance`, `config`) and
-  `StakingRewardsManagerBase` selectors (`balanceOf`, `earned(address,address)`,
-  `rewardTokensLength`, `rewardTokens`, `getReward`, `stakingToken`) all confirmed present in
-  bytecode against a real mainnet fleet + its rewards manager, plus a live
-  `config()`/`asset()`/`name()` read and a `stakingToken() == fleet` wiring check on the Base USDC
-  fleet.
-- Chainlink `ETH/USD` and `EUR/USD` feed addresses confirmed via `description()`.
-- Cross-chain read smoke: `scripts/check-positions.ts` against one known holder per chain returned
-  ≥1 position on every chain with no failed-chain warnings.
+Use these settings (or build locally and upload the `out` folder):
 
-Full command-by-command output lives in the Phase 5 verification report (not part of this repo).
+| Setting          | Value          |
+| ---------------- | -------------- |
+| Build command    | `npm run build`|
+| Output directory | `out`          |
+| Node version     | `20`           |
 
-## `scripts/check-positions.ts`
-
-Read-only CLI smoke test - walks `HarborCommand` + `EXTRA_FLEETS` on every supported chain and
-prints any fleet position (wallet + staked shares, converted to assets) for a given address, using
-the same on-chain read path the app uses.
+To build the files yourself:
 
 ```bash
-cd apps/earn-exit
-npx tsx --tsconfig tsconfig.json scripts/check-positions.ts 0xYourAddress
+npm install
+npm run build     # creates the ready-to-host "out" folder
 ```
 
-Override a chain's RPC for the run (useful when a default public RPC is flaky) with the same
-`NEXT_PUBLIC_RPC_URL_*` env vars the app reads, e.g.:
+Then upload everything inside `out/` to your host (S3 + CloudFront, nginx, GitHub Pages, etc.).
 
-```bash
-NEXT_PUBLIC_RPC_URL_MAINNET=https://ethereum-rpc.publicnode.com \
-  npx tsx --tsconfig tsconfig.json scripts/check-positions.ts 0xYourAddress
-```
+> **Tip:** If your host shows a "not found" error when visiting `/portfolio`, it isn't mapping
+> clean URLs to their HTML files. Fix it by adding `trailingSlash: true` to
+> [`next.config.ts`](next.config.ts) and rebuilding.
 
-Exits after printing each position and a count; prints `failed chains: [...]` if any chain's RPC
-call errored (the run should still complete for the rest).
+---
+
+## Optional configuration
+
+The app needs no setup, but you can add **WalletConnect** support (for mobile wallets and the
+WalletConnect QR flow) by providing a free project ID from
+[cloud.walletconnect.com](https://cloud.walletconnect.com):
+
+- Create a file named `.env.local` in the project folder with:
+
+  ```
+  NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your-id-here
+  ```
+
+- Or, on Vercel/Netlify/Cloudflare, add it as an **environment variable** in the project settings.
+
+Without it, browser-extension wallets (MetaMask, Rabby, etc.) still work normally.
+
+---
+
+## Good to know
+
+- **USD values are approximate** — token amounts are always exact. Stablecoins and ETH/EUR are
+  priced from on-chain Chainlink feeds; staked SUMR shows an exact token amount with no USD estimate.
+- **Paused vaults** are marked and grouped separately — they can't be exited until unpaused.
+- If an exit fails because a vault can't serve the full amount right now, retrying later usually works.
+
+---
+
+## For maintainers
+
+- **Commands:** `npm run dev` (local), `npm run build` (static build → `out/`),
+  `npm run lint`, `npm run typecheck`, `npm test`.
+- **Contract addresses** live in [`constants/addresses.ts`](constants/addresses.ts). If a fleet is
+  decommissioned during the wind-down, add its address to `EXTRA_FLEETS` so remaining holders can
+  still see and exit it.
+- **`AdmiralsQuarters` addresses** are the current role-holding deployments (the ones in the SDK's
+  `sumr.json` are stale and cause staked exits to revert). If the deployment moves again, rediscover
+  the address that holds `ADMIRALS_QUARTERS_ROLE` on every fleet's rewards manager.
+- **Sanity-check the read path** without a browser using
+  [`scripts/check-positions.ts`](scripts/check-positions.ts):
+
+  ```bash
+  npx tsx scripts/check-positions.ts 0xYourAddress
+  ```
+
+---
+
+## License
+
+[MIT](LICENSE) — free to use, modify, host, and redistribute.
