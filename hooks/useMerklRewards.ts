@@ -24,7 +24,12 @@ export const useMerklRewards = (address?: Address) => {
           (chainId) => chainId === campaign.distributionChainId,
         ),
       );
-      return getMerklRewards(address, claimableCampaigns);
+      // Query every app-supported chain, not just the chains current campaigns
+      // distribute on — rewards from any Summer campaign are surfaced wherever
+      // Merkl pays them out.
+      return getMerklRewards(address, claimableCampaigns, {
+        chainIds: [...SUPPORTED_CHAIN_IDS],
+      });
     },
   });
 };

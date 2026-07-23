@@ -469,11 +469,25 @@ const PortfolioContent = () => {
               <Text as="h3" variant="h3">
                 Merkl Rewards
               </Text>
-              <ClaimableRewardsCard
-                rewards={merklData.rewards}
-                user={viewedAddress}
-                isOwnWallet={isOwnWallet}
-              />
+              {/* One card per distribution chain — each card has its own header and
+                  claim button, and a claim only ever touches its own chain. */}
+              {[
+                ...merklData.rewards
+                  .reduce((groups, reward) => {
+                    const group = groups.get(reward.chainId) ?? [];
+                    group.push(reward);
+                    groups.set(reward.chainId, group);
+                    return groups;
+                  }, new Map<number, typeof merklData.rewards>())
+                  .entries(),
+              ].map(([chainId, chainRewards]) => (
+                <ClaimableRewardsCard
+                  key={chainId}
+                  rewards={chainRewards}
+                  user={viewedAddress}
+                  isOwnWallet={isOwnWallet}
+                />
+              ))}
             </div>
           ) : null}
         </div>

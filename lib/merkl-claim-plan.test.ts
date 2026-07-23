@@ -30,6 +30,7 @@ describe("buildMerklClaimTx", () => {
       {
         campaignId: "0xCamp1",
         vaultAddress: null,
+        opportunityName: null,
         amount: 5000000n,
       },
     ],

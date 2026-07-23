@@ -89,6 +89,19 @@ export const ClaimableRewardsCard: FC<ClaimableRewardsCardProps> = ({
 
         const includesExternal = reward.summerAmount < reward.cumulativeAmount;
 
+        // Per-opportunity breakdown, aggregated by name (several campaigns can
+        // feed one opportunity). Amounts are lifetime earned per opportunity.
+        const sourceRows = (() => {
+          const byName = new Map<string, bigint>();
+          for (const source of reward.sources) {
+            const name = source.opportunityName ?? "Other Summer campaigns";
+            byName.set(name, (byName.get(name) ?? 0n) + source.amount);
+          }
+          return [...byName.entries()].sort((a, b) =>
+            a[1] === b[1] ? 0 : b[1] > a[1] ? 1 : -1,
+          );
+        })();
+
         return (
           <div key={`${reward.chainId}-${reward.token.address}-${index}`}>
             <hr className={classNames.divider} />
@@ -107,6 +120,36 @@ export const ClaimableRewardsCard: FC<ClaimableRewardsCardProps> = ({
                     ? ` (≈ $${formatFiatBalance(usdEstimate)})`
                     : ""}
                 </Text>
+                {sourceRows.length > 0 ? (
+                  <div className={classNames.sourcesList}>
+                    {sourceRows.map(([name, amount]) => (
+                      <div key={name} className={classNames.sourceRow}>
+                        <Text
+                          as="p"
+                          variant="p4"
+                          style={{
+                            color: "var(--earn-protocol-secondary-60)",
+                          }}
+                        >
+                          {name}
+                        </Text>
+                        <Text
+                          as="p"
+                          variant="p4"
+                          style={{
+                            color: "var(--earn-protocol-secondary-60)",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {formatCryptoBalance(
+                            formatUnits(amount, reward.token.decimals),
+                          )}{" "}
+                          {reward.token.symbol}
+                        </Text>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
                 {includesExternal ? (
                   <Text
                     as="p"

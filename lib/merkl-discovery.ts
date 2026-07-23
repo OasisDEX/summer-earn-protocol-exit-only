@@ -24,6 +24,10 @@ export interface MerklApiCampaign {
     targetToken?: Address;
     [key: string]: unknown;
   };
+  /** Embedded when the request passes withOpportunity=true. */
+  Opportunity?: {
+    name?: string;
+  };
 }
 
 export interface SummerMerklCampaign {
@@ -37,11 +41,13 @@ export interface SummerMerklCampaign {
     chainId: number;
   };
   vaultAddress: Address | null;
+  /** Merkl opportunity display name, e.g. "Deposit USDC on Summer Finance (lower risk)". */
+  opportunityName: string | null;
   startTimestamp: number;
   endTimestamp: number;
 }
 
-const CACHE_KEY = "summer_merkl_campaigns_v1";
+const CACHE_KEY = "summer_merkl_campaigns_v2";
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 interface CachePayload {
@@ -93,7 +99,7 @@ export const discoverSummerCampaigns = async (
   for (const protocolId of MERKL_PROTOCOL_IDS) {
     for (let page = 0; ; page++) {
       const response = await fetcher(
-        `${MERKL_API_BASE}/campaigns?mainProtocolId=${protocolId}&items=100&page=${page}`,
+        `${MERKL_API_BASE}/campaigns?mainProtocolId=${protocolId}&items=100&page=${page}&withOpportunity=true`,
       );
       if (!response.ok) {
         throw new Error(`Merkl campaigns fetch failed: ${response.status}`);
@@ -120,6 +126,7 @@ export const discoverSummerCampaigns = async (
             campaign.params?.vaultAddress ??
             campaign.params?.targetToken ??
             null,
+          opportunityName: campaign.Opportunity?.name ?? null,
           startTimestamp: campaign.startTimestamp,
           endTimestamp: campaign.endTimestamp,
         });

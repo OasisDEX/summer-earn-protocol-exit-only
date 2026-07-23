@@ -51,6 +51,7 @@ export interface MerklClaimableReward {
   sources: {
     campaignId: string;
     vaultAddress: Address | null;
+    opportunityName: string | null;
     amount: bigint;
   }[];
 }
@@ -58,18 +59,29 @@ export interface MerklClaimableReward {
 export const getMerklRewards = async (
   user: Address,
   campaigns: SummerMerklCampaign[],
-  customFetch?: typeof fetch,
+  options?: {
+    /**
+     * Chains to query user rewards on. Defaults to the campaigns' distribution
+     * chains; pass a wider list (e.g. all app-supported chains) so rewards
+     * distributed anywhere the app can claim are surfaced.
+     */
+    chainIds?: number[];
+    fetcher?: typeof fetch;
+  },
 ): Promise<{ rewards: MerklClaimableReward[]; failedChainIds: number[] }> => {
   if (!user || campaigns.length === 0) {
     return { rewards: [], failedChainIds: [] };
   }
 
-  const fetcher = customFetch ?? fetch;
+  const fetcher = options?.fetcher ?? fetch;
   const campaignById = new Map(
     campaigns.map((campaign) => [campaign.campaignId, campaign]),
   );
   const chainIds = [
-    ...new Set(campaigns.map((campaign) => campaign.distributionChainId)),
+    ...new Set(
+      options?.chainIds ??
+        campaigns.map((campaign) => campaign.distributionChainId),
+    ),
   ];
 
   const results = await Promise.allSettled(
@@ -130,6 +142,7 @@ export const getMerklRewards = async (
           sources.push({
             campaignId: b.campaignId,
             vaultAddress: campaign?.vaultAddress ?? null,
+            opportunityName: campaign?.opportunityName ?? null,
             amount: amt,
           });
         }

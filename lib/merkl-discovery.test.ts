@@ -17,6 +17,7 @@ describe("discoverSummerCampaigns", () => {
       chainId: 8453,
     },
     params: { vaultAddress: "0xVault1" },
+    Opportunity: { name: "Deposit USDC on Summer Finance (lower risk)" },
   };
 
   const mockCampaign2 = {
@@ -75,6 +76,11 @@ describe("discoverSummerCampaigns", () => {
     expect(campaigns).toHaveLength(2);
     expect(campaigns.map((c) => c.campaignId)).toEqual(["0x1111", "0x2222"]);
     expect(campaigns[0].vaultAddress).toBe("0xVault1");
+    expect(campaigns[0].opportunityName).toBe(
+      "Deposit USDC on Summer Finance (lower risk)",
+    );
+    // Campaign without an embedded Opportunity falls back to null.
+    expect(campaigns[1].opportunityName).toBeNull();
   });
 
   it("throws when HTTP fetch fails", async () => {
