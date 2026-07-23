@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import {
   Button,
   Card,
@@ -14,6 +14,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { type Address, isAddress } from "viem";
 import { useAccount } from "wagmi";
 
+import { ClaimableRewardsCard } from "@/components/ClaimableRewardsCard";
 import { ConnectButton } from "@/components/ConnectButton";
 import { ExitModal } from "@/components/ExitModal";
 import { FooterWrapper } from "@/components/FooterWrapper";
@@ -23,6 +24,7 @@ import { PositionCardSkeleton } from "@/components/PositionCardSkeleton";
 import { StakedSumrCard } from "@/components/StakedSumrCard";
 import { UnstakeModal } from "@/components/UnstakeModal";
 import { CHAIN_LABELS } from "@/constants/chains";
+import { useMerklRewards } from "@/hooks/useMerklRewards";
 import { usePositions } from "@/hooks/usePositions";
 import { useStakedSumr } from "@/hooks/useStakedSumr";
 import { type UnstakeRequest } from "@/hooks/useUnstakeFlow";
@@ -94,10 +96,26 @@ const PortfolioContent = () => {
     address.toLowerCase() === viewedAddress.toLowerCase(),
   );
 
-  // Keep the URL shareable: stamp the connected address into ?wallet= when it's missing.
-  // status === 'connected' only - a stale 'reconnecting' address must not be stamped.
+  // Keep the URL shareable: stamp the connected address into ?wallet= when it's missing, and
+  // follow wallet switches — if ?wallet= still points at the previously connected wallet when a
+  // different one connects, move it along. A deliberately viewed third-party ?wallet= is left
+  // alone. status === 'connected' only - a stale 'reconnecting' address must not be stamped.
+  const lastConnectedRef = useRef<Address | undefined>(undefined);
+
   useEffect(() => {
-    if (accountStatus === "connected" && !walletParam) {
+    if (accountStatus !== "connected" || !address) return;
+
+    const previousConnected = lastConnectedRef.current;
+
+    lastConnectedRef.current = address;
+
+    const followsPreviousWallet =
+      walletParam &&
+      previousConnected &&
+      previousConnected.toLowerCase() !== address.toLowerCase() &&
+      walletParam.toLowerCase() === previousConnected.toLowerCase();
+
+    if (!walletParam || followsPreviousWallet) {
       router.replace(`/portfolio?wallet=${address}`);
     }
   }, [accountStatus, address, walletParam, router]);
@@ -114,6 +132,11 @@ const PortfolioContent = () => {
     refetch: refetchStaked,
     isRefetching: stakedRefetching,
   } = useStakedSumr(viewedAddress);
+  const {
+    data: merklData,
+    refetch: refetchMerkl,
+    isRefetching: merklRefetching,
+  } = useMerklRewards(viewedAddress);
   const stakedPosition = staked?.position ?? null;
 
   // Seamless refresh: dim the current list while a refetch is in flight (no skeleton, which is
@@ -240,10 +263,13 @@ const PortfolioContent = () => {
               {mounted && viewedAddress ? (
                 <Button
                   variant="secondarySmall"
-                  disabled={positionsRefetching || stakedRefetching}
+                  disabled={
+                    positionsRefetching || stakedRefetching || merklRefetching
+                  }
                   onClick={() => {
                     void refetch();
                     void refetchStaked();
+                    void refetchMerkl();
                   }}
                   style={{
                     display: "flex",
@@ -251,7 +277,9 @@ const PortfolioContent = () => {
                     gap: "var(--general-space-8)",
                   }}
                 >
-                  {positionsRefetching || stakedRefetching ? (
+                  {positionsRefetching ||
+                  stakedRefetching ||
+                  merklRefetching ? (
                     <LoadingSpinner size={16} strokeWidth={3} />
                   ) : null}
                   Refresh
@@ -422,6 +450,44 @@ const PortfolioContent = () => {
                     : undefined
                 }
               />
+            </div>
+          ) : null}
+
+          {mounted &&
+          viewedAddress &&
+          merklData &&
+          merklData.rewards.length > 0 ? (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "var(--general-space-24)",
+                marginTop: "var(--general-space-16)",
+                ...fadeWhileRefetching(merklRefetching),
+              }}
+            >
+              <Text as="h3" variant="h3">
+                Merkl Rewards
+              </Text>
+              {/* One card per distribution chain — each card has its own header and
+                  claim button, and a claim only ever touches its own chain. */}
+              {[
+                ...merklData.rewards
+                  .reduce((groups, reward) => {
+                    const group = groups.get(reward.chainId) ?? [];
+                    group.push(reward);
+                    groups.set(reward.chainId, group);
+                    return groups;
+                  }, new Map<number, typeof merklData.rewards>())
+                  .entries(),
+              ].map(([chainId, chainRewards]) => (
+                <ClaimableRewardsCard
+                  key={chainId}
+                  rewards={chainRewards}
+                  user={viewedAddress}
+                  isOwnWallet={isOwnWallet}
+                />
+              ))}
             </div>
           ) : null}
         </div>
