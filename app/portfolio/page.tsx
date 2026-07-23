@@ -14,6 +14,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { type Address, isAddress } from "viem";
 import { useAccount } from "wagmi";
 
+import { ClaimableRewardsCard } from "@/components/ClaimableRewardsCard";
 import { ConnectButton } from "@/components/ConnectButton";
 import { ExitModal } from "@/components/ExitModal";
 import { FooterWrapper } from "@/components/FooterWrapper";
@@ -23,6 +24,7 @@ import { PositionCardSkeleton } from "@/components/PositionCardSkeleton";
 import { StakedSumrCard } from "@/components/StakedSumrCard";
 import { UnstakeModal } from "@/components/UnstakeModal";
 import { CHAIN_LABELS } from "@/constants/chains";
+import { useMerklRewards } from "@/hooks/useMerklRewards";
 import { usePositions } from "@/hooks/usePositions";
 import { useStakedSumr } from "@/hooks/useStakedSumr";
 import { type UnstakeRequest } from "@/hooks/useUnstakeFlow";
@@ -114,6 +116,11 @@ const PortfolioContent = () => {
     refetch: refetchStaked,
     isRefetching: stakedRefetching,
   } = useStakedSumr(viewedAddress);
+  const {
+    data: merklData,
+    refetch: refetchMerkl,
+    isRefetching: merklRefetching,
+  } = useMerklRewards(viewedAddress);
   const stakedPosition = staked?.position ?? null;
 
   // Seamless refresh: dim the current list while a refetch is in flight (no skeleton, which is
@@ -240,10 +247,13 @@ const PortfolioContent = () => {
               {mounted && viewedAddress ? (
                 <Button
                   variant="secondarySmall"
-                  disabled={positionsRefetching || stakedRefetching}
+                  disabled={
+                    positionsRefetching || stakedRefetching || merklRefetching
+                  }
                   onClick={() => {
                     void refetch();
                     void refetchStaked();
+                    void refetchMerkl();
                   }}
                   style={{
                     display: "flex",
@@ -251,7 +261,9 @@ const PortfolioContent = () => {
                     gap: "var(--general-space-8)",
                   }}
                 >
-                  {positionsRefetching || stakedRefetching ? (
+                  {positionsRefetching ||
+                  stakedRefetching ||
+                  merklRefetching ? (
                     <LoadingSpinner size={16} strokeWidth={3} />
                   ) : null}
                   Refresh
@@ -421,6 +433,30 @@ const PortfolioContent = () => {
                         })
                     : undefined
                 }
+              />
+            </div>
+          ) : null}
+
+          {mounted &&
+          viewedAddress &&
+          merklData &&
+          merklData.rewards.length > 0 ? (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "var(--general-space-24)",
+                marginTop: "var(--general-space-16)",
+                ...fadeWhileRefetching(merklRefetching),
+              }}
+            >
+              <Text as="h3" variant="h3">
+                Merkl Rewards
+              </Text>
+              <ClaimableRewardsCard
+                rewards={merklData.rewards}
+                user={viewedAddress}
+                isOwnWallet={isOwnWallet}
               />
             </div>
           ) : null}
