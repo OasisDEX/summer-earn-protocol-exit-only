@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import {
   Button,
   Card,
@@ -96,10 +96,26 @@ const PortfolioContent = () => {
     address.toLowerCase() === viewedAddress.toLowerCase(),
   );
 
-  // Keep the URL shareable: stamp the connected address into ?wallet= when it's missing.
-  // status === 'connected' only - a stale 'reconnecting' address must not be stamped.
+  // Keep the URL shareable: stamp the connected address into ?wallet= when it's missing, and
+  // follow wallet switches — if ?wallet= still points at the previously connected wallet when a
+  // different one connects, move it along. A deliberately viewed third-party ?wallet= is left
+  // alone. status === 'connected' only - a stale 'reconnecting' address must not be stamped.
+  const lastConnectedRef = useRef<Address | undefined>(undefined);
+
   useEffect(() => {
-    if (accountStatus === "connected" && !walletParam) {
+    if (accountStatus !== "connected" || !address) return;
+
+    const previousConnected = lastConnectedRef.current;
+
+    lastConnectedRef.current = address;
+
+    const followsPreviousWallet =
+      walletParam &&
+      previousConnected &&
+      previousConnected.toLowerCase() !== address.toLowerCase() &&
+      walletParam.toLowerCase() === previousConnected.toLowerCase();
+
+    if (!walletParam || followsPreviousWallet) {
       router.replace(`/portfolio?wallet=${address}`);
     }
   }, [accountStatus, address, walletParam, router]);

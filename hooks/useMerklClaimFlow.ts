@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { type Address } from "viem";
-import { sendTransaction } from "wagmi/actions";
+import { getAccount, sendTransaction, switchChain } from "wagmi/actions";
 
 import { getPublicClient } from "@/lib/clients";
 import { buildMerklClaimTx, type MerklClaimTx } from "@/lib/merkl-claim-plan";
@@ -50,11 +50,21 @@ export const useMerklClaimFlow = (
 
     try {
       for (const tx of txs) {
+        const chainId =
+          tx.chainId as (typeof wagmiConfig)["chains"][number]["id"];
+
+        // sendTransaction does not switch chains itself — it throws on a mismatch.
+        // Claims land on the distribution chain (usually Base) regardless of where the
+        // wallet currently sits, and a multi-chain claim needs a switch between txs.
+        if (getAccount(wagmiConfig).chainId !== tx.chainId) {
+          await switchChain(wagmiConfig, { chainId });
+        }
+
         const hash = await sendTransaction(wagmiConfig, {
           to: tx.to,
           data: tx.data,
           value: tx.value,
-          chainId: tx.chainId as (typeof wagmiConfig)["chains"][number]["id"],
+          chainId,
         });
 
         // Wait via our own RPC (public client), independent of the wallet's provider.

@@ -14,6 +14,12 @@ const walletConnectProjectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
 
 export const wagmiConfig = createConfig({
   chains: SUPPORTED_CHAINS,
+  // Without `ssr`, wagmi's <Hydrate> starts wallet reconnection DURING render, mutating the
+  // store while React is rendering ("Cannot update a component (`PortfolioContent`) while
+  // rendering a different component (`Hydrate`)"). With `ssr: true` it runs in an effect
+  // instead — correct for this statically-exported app, which already gates wallet-dependent
+  // UI behind a `mounted` flag (see portfolio/page.tsx).
+  ssr: true,
   connectors: [
     injected(),
     ...(walletConnectProjectId
