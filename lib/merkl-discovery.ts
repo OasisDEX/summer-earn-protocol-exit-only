@@ -1,9 +1,5 @@
 import { type Address } from "viem";
-import {
-  MERKL_API_BASE,
-  MERKL_PROTOCOL_IDS,
-  MERKL_TRUSTED_CREATORS,
-} from "@/constants/merkl";
+import { MERKL_API_BASE, MERKL_TRUSTED_CREATORS } from "@/constants/merkl";
 
 export interface MerklApiCampaign {
   campaignId: string;
@@ -47,7 +43,7 @@ export interface SummerMerklCampaign {
   endTimestamp: number;
 }
 
-const CACHE_KEY = "summer_merkl_campaigns_v2";
+const CACHE_KEY = "summer_merkl_campaigns_v3";
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 interface CachePayload {
@@ -96,10 +92,15 @@ export const discoverSummerCampaigns = async (
   const fetcher = customFetch ?? fetch;
   const byId = new Map<string, SummerMerklCampaign>();
 
-  for (const protocolId of MERKL_PROTOCOL_IDS) {
+  // Enumerate by creator, not by mainProtocolId: JSON_AIRDROP campaigns hang off
+  // opportunities with no protocol, so Merkl omits them from
+  // ?mainProtocolId=summerfinance entirely. Creator is a strict superset of the
+  // protocol lists (verified: 0 campaigns lost, 22 airdrops gained) and matches
+  // the trust boundary we already enforce below.
+  for (const creator of MERKL_TRUSTED_CREATORS) {
     for (let page = 0; ; page++) {
       const response = await fetcher(
-        `${MERKL_API_BASE}/campaigns?mainProtocolId=${protocolId}&items=100&page=${page}&withOpportunity=true`,
+        `${MERKL_API_BASE}/campaigns?creatorAddress=${creator}&items=100&page=${page}&withOpportunity=true`,
       );
       if (!response.ok) {
         throw new Error(`Merkl campaigns fetch failed: ${response.status}`);
@@ -107,11 +108,13 @@ export const discoverSummerCampaigns = async (
       const campaigns = (await response.json()) as MerklApiCampaign[];
 
       for (const campaign of campaigns) {
+        // Re-check creator on the response: if Merkl ever stops honouring the
+        // creatorAddress filter, an unfiltered page must not import every
+        // campaign on the platform as a "Summer" campaign.
         if (
-          MERKL_TRUSTED_CREATORS.length > 0 &&
           !MERKL_TRUSTED_CREATORS.some(
-            (creator) =>
-              creator.toLowerCase() === campaign.creatorAddress.toLowerCase(),
+            (trusted) =>
+              trusted.toLowerCase() === campaign.creatorAddress.toLowerCase(),
           )
         ) {
           continue;

@@ -11,10 +11,11 @@ export const MERKL_API_BASE =
 export const MERKL_DISTRIBUTOR: Address =
   "0x3Ef3D8bA38EBe18DB133cEc108f4D14CE00Dd9Ae";
 
-/** Both Merkl protocol IDs for Summer — union + deduplicate. */
-export const MERKL_PROTOCOL_IDS = ["summerfinance", "SummerFinance"] as const;
-
-/** Trusted campaign creators for Summer campaigns. */
+/**
+ * Trusted campaign creators for Summer campaigns. Doubles as the discovery axis:
+ * campaigns are enumerated per creator (see lib/merkl-discovery.ts) because
+ * Merkl's mainProtocolId filter omits airdrop campaigns.
+ */
 export const MERKL_TRUSTED_CREATORS: Address[] = [
   "0x447BF9d1485ABDc4C1778025DfdfbE8b894C3796",
 ];
