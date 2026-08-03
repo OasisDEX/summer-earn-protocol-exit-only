@@ -56,6 +56,11 @@ export const summerStakingAbi = parseAbi([
   // Self-claim: the caller claims their OWN rewards. (getRewardFor(account,...) is the on-behalf
   // path and reverts for a direct user with a caller-not-authorized error.)
   "function getReward(address rewardToken)",
+  // Token pulled is SUMR (SUMMER_TOKEN()), not stSUMR - the approval target differs from unstake.
+  "function stakeLockup(uint256 amount, uint256 lockupPeriod)",
+  "function getBucketDetails(uint8 bucket) view returns (uint256 cap, uint256 staked, uint256 minLockupPeriod, uint256 maxLockupPeriod)",
+  // A user at this many stakes cannot stake again - the contract rejects any further stake.
+  "function MAX_AMOUNT_OF_STAKES() view returns (uint256)",
 ]);
 
 export const chainlinkAggregatorAbi = parseAbi([

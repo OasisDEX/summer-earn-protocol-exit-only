@@ -21,15 +21,19 @@ import { FooterWrapper } from "@/components/FooterWrapper";
 import { FractalGlassBackground } from "@/components/FractalGlassBackground/FractalGlassBackground";
 import { PositionCard } from "@/components/PositionCard";
 import { PositionCardSkeleton } from "@/components/PositionCardSkeleton";
+import { StakeModal } from "@/components/StakeModal";
+import { StakeSumrCard } from "@/components/StakeSumrCard";
 import { StakedSumrCard } from "@/components/StakedSumrCard";
 import { UnstakeModal } from "@/components/UnstakeModal";
 import { CHAIN_LABELS } from "@/constants/chains";
 import { useMerklRewards } from "@/hooks/useMerklRewards";
 import { usePositions } from "@/hooks/usePositions";
+import { useStakeAvailability } from "@/hooks/useStakeAvailability";
 import { useStakedSumr } from "@/hooks/useStakedSumr";
 import { type UnstakeRequest } from "@/hooks/useUnstakeFlow";
 import { formatFiatBalance } from "@/lib/format";
 import { type FleetPosition } from "@/lib/positions";
+import { type StakeAvailability } from "@/lib/stake-availability";
 import { estimateUsdValue } from "@/lib/prices";
 import { type SumrStake } from "@/lib/staking";
 
@@ -73,6 +77,10 @@ const PortfolioContent = () => {
   const [unstakeRequest, setUnstakeRequest] = useState<UnstakeRequest | null>(
     null,
   );
+  // A snapshot, not a boolean: a background refetch that fails resolves `availability` to null,
+  // which would otherwise slam the modal shut mid-flow. Mirrors how `unstakeRequest` freezes the
+  // stake it was opened with.
+  const [stakeTarget, setStakeTarget] = useState<StakeAvailability | null>(null);
   const [showPaused, setShowPaused] = useState(false);
 
   // Hydration guard: this is a static export, so the server prerenders with no wallet and no
@@ -133,11 +141,17 @@ const PortfolioContent = () => {
     isRefetching: stakedRefetching,
   } = useStakedSumr(viewedAddress);
   const {
+    data: stakeAvailability,
+    refetch: refetchStakeAvailability,
+    isRefetching: stakeAvailabilityRefetching,
+  } = useStakeAvailability(viewedAddress);
+  const {
     data: merklData,
     refetch: refetchMerkl,
     isRefetching: merklRefetching,
   } = useMerklRewards(viewedAddress);
   const stakedPosition = staked?.position ?? null;
+  const availability = stakeAvailability?.availability ?? null;
 
   // Seamless refresh: dim the current list while a refetch is in flight (no skeleton, which is
   // reserved for the initial load). pointer-events off so stale action buttons can't be clicked.
@@ -264,11 +278,15 @@ const PortfolioContent = () => {
                 <Button
                   variant="secondarySmall"
                   disabled={
-                    positionsRefetching || stakedRefetching || merklRefetching
+                    positionsRefetching ||
+                    stakedRefetching ||
+                    stakeAvailabilityRefetching ||
+                    merklRefetching
                   }
                   onClick={() => {
                     void refetch();
                     void refetchStaked();
+                    void refetchStakeAvailability();
                     void refetchMerkl();
                   }}
                   style={{
@@ -279,6 +297,7 @@ const PortfolioContent = () => {
                 >
                   {positionsRefetching ||
                   stakedRefetching ||
+                  stakeAvailabilityRefetching ||
                   merklRefetching ? (
                     <LoadingSpinner size={16} strokeWidth={3} />
                   ) : null}
@@ -414,6 +433,31 @@ const PortfolioContent = () => {
             </Text>
           ) : null}
 
+          {mounted &&
+          viewedAddress &&
+          availability &&
+          availability.walletBalance > 0n ? (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "var(--general-space-24)",
+                marginTop: "var(--general-space-16)",
+                ...fadeWhileRefetching(stakeAvailabilityRefetching),
+              }}
+            >
+              <Text as="h3" variant="h3">
+                Stake SUMR
+              </Text>
+              <StakeSumrCard
+                availability={availability}
+                onStake={
+                  isOwnWallet ? () => setStakeTarget(availability) : undefined
+                }
+              />
+            </div>
+          ) : null}
+
           {mounted && viewedAddress && stakedPosition ? (
             <div
               style={{
@@ -502,6 +546,14 @@ const PortfolioContent = () => {
         request={unstakeRequest}
         onClose={() => setUnstakeRequest(null)}
         onRefresh={() => void refetchStaked()}
+      />
+      <StakeModal
+        availability={stakeTarget}
+        onClose={() => setStakeTarget(null)}
+        onRefresh={() => {
+          void refetchStaked();
+          void refetchStakeAvailability();
+        }}
       />
     </>
   );

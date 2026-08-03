@@ -1,7 +1,7 @@
 # Summer.fi Exit App
 
-A simple, self-contained web app that lets Summer.fi depositors **withdraw their funds** and
-**unstake their SUMR** during the protocol wind-down. Connect a wallet, see your positions, exit.
+A simple, self-contained web app that lets Summer.fi depositors **withdraw their funds**,
+**unstake their SUMR**, and **stake SUMR with no lock-up** during the protocol wind-down. Connect a wallet, see your positions, exit.
 
 It talks directly to the blockchain — there is no backend, no database, and no account to create.
 The whole app builds into a folder of static files you can host anywhere.
@@ -92,6 +92,7 @@ Without it, browser-extension wallets (MetaMask, Rabby, etc.) still work normall
   priced from on-chain Chainlink feeds; staked SUMR shows an exact token amount with no USD estimate.
 - **Paused vaults** are marked and grouped separately — they can't be exited until unpaused.
 - If an exit fails because a vault can't serve the full amount right now, retrying later usually works.
+- No-lockup stakes can be unstaked at any time with no penalty, and the no-lockup bucket has a fixed capacity cap — so how much you can stake may be limited by remaining bucket headroom rather than by your wallet balance.
 
 ---
 

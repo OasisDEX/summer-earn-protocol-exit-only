@@ -1,3 +1,4 @@
+export { AmountInput } from './AmountInput'
 export { Button } from './Button'
 export { Card } from './Card'
 export { Icon, type IconNamesList } from './Icon'
