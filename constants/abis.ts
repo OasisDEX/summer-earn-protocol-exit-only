@@ -14,7 +14,15 @@ export const fleetCommanderAbi = parseAbi([
   "function paused() view returns (bool)",
   "function allowance(address owner, address spender) view returns (uint256)",
   "function approve(address spender, uint256 value) returns (bool)",
+  // Institutional exit path: a direct ERC-4626 redeem, no AdmiralsQuarters involved. Shares in
+  // (not assets in) so share->asset rounding cannot leave dust behind.
+  "function redeem(uint256 shares, address receiver, address owner) returns (uint256)",
+  // Caps the redeem when the fleet's liquidity buffer is short - a partial exit that succeeds
+  // beats a full exit that reverts.
+  "function maxRedeem(address owner) view returns (uint256)",
   "function config() view returns (address bufferArk, uint256 minimumBufferBalance, uint256 depositCap, uint256 maxRebalanceOperations, address stakingRewardsManager)",
+  // Read only by scripts/check-institutions.ts, for a human-readable TVL in its output.
+  "function totalAssets() view returns (uint256)",
 ]);
 
 export const stakingRewardsManagerAbi = parseAbi([

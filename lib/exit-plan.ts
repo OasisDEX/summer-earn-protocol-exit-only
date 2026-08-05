@@ -13,19 +13,82 @@ export type ExitStepType = "approve" | "exit" | "claim";
 export interface ExitStep {
   type: ExitStepType;
   label: string;
+  /**
+   * Institutional-only: true when this step redeems less than the caller's full wallet shares.
+   * Lets consumers (e.g. the UI's completion message) detect a partial exit structurally instead
+   * of string-matching the human-readable `label`.
+   */
+  capped?: boolean;
   tx: { to: Address; data: Hex; value: bigint; chainId: number };
 }
 
 /**
- * Full exit to the underlying asset - replicates the SDK's AdmiralsQuarters route.
- * `0` amounts are the protocol's "everything" sentinel (see plan README).
+ * Institutional exit: one direct ERC-4626 redeem. No approval (the user redeems their own
+ * shares), no AdmiralsQuarters (verified: institutional AQs do not implement
+ * unstakeAndWithdrawAssets and there is no staked leg to need it), no rewards sweep (every
+ * institutional fleet reports stakingRewardsManager == 0x0).
+ */
+const buildInstitutionalExitPlan = (
+  position: FleetPosition,
+  user: Address,
+  maxRedeem: bigint,
+): ExitStep[] => {
+  // Ceiling is walletShares, not totalShares: a DIRECT redeem moves shares out of the caller's
+  // own wallet balance and can never touch a staked leg. Behaviour-neutral today (every
+  // institutional fleet reports stakingRewardsManager == 0x0, so stakedShares is always 0n), but
+  // min(totalShares, maxRedeem) would, for a fleet that ever had a staked leg, build a redeem for
+  // more shares than the wallet holds - a guaranteed revert that blocks even the walletShares
+  // portion.
+  // Also cap at maxRedeem: a fleet whose liquidity buffer is short would revert on the full
+  // balance, and a partial exit that succeeds beats a full exit that does not.
+  const shares =
+    maxRedeem < position.walletShares ? maxRedeem : position.walletShares;
+
+  if (shares === 0n) return [];
+
+  const capped = shares < position.walletShares;
+
+  return [
+    {
+      type: "exit",
+      label: capped
+        ? `Withdraw ${position.asset.symbol} (capped by vault liquidity)`
+        : `Withdraw all ${position.asset.symbol}`,
+      capped,
+      tx: {
+        to: position.fleetAddress,
+        data: encodeFunctionData({
+          abi: fleetCommanderAbi,
+          functionName: "redeem",
+          // Shares in, not assets in, so share->asset rounding leaves no dust behind.
+          args: [shares, user, user],
+        }),
+        value: 0n,
+        chainId: position.chainId,
+      },
+    },
+  ];
+};
+
+/**
+ * Full exit to the underlying asset for the PUBLIC path - replicates the SDK's AdmiralsQuarters
+ * route. `0` amounts are the protocol's "everything" sentinel (see plan README). Institutional
+ * positions never reach this route: they are dispatched above to buildInstitutionalExitPlan, the
+ * single-redeem builder, before any of this runs.
  */
 export const buildExitPlan = (params: {
   position: FleetPosition;
+  user: Address;
   allowance: bigint;
   hasClaimableRewards: boolean;
+  /** Institutional path only; the public path exits via the AdmiralsQuarters "everything" sentinel. */
+  maxRedeem: bigint;
 }): ExitStep[] => {
-  const { position, allowance, hasClaimableRewards } = params;
+  const { position, user, allowance, hasClaimableRewards, maxRedeem } = params;
+
+  if (position.institution)
+    return buildInstitutionalExitPlan(position, user, maxRedeem);
+
   const { admiralsQuarters } = CORE_ADDRESSES[position.chainId];
   const steps: ExitStep[] = [];
 

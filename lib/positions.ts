@@ -7,8 +7,13 @@ import {
 } from "@/constants/abis";
 import { CORE_ADDRESSES, EXTRA_FLEETS } from "@/constants/addresses";
 import { SUPPORTED_CHAIN_IDS } from "@/constants/chains";
+import { type Institution, INSTITUTIONS } from "@/constants/institutions";
 import { getPublicClient } from "@/lib/clients";
 import { humanizeFleetName } from "@/lib/fleet-name";
+import {
+  disambiguateInstitutionNames,
+  institutionDisplayName,
+} from "@/lib/institution-name";
 
 export interface FleetPosition {
   chainId: number;
@@ -22,6 +27,12 @@ export interface FleetPosition {
   totalAssets: bigint;
   stakingRewardsManager: Address | null;
   paused: boolean;
+  /**
+   * Set for vaults belonging to a per-institution deployment; null for public fleets. Drives the
+   * single-redeem exit path and the INSTITUTIONAL tag. There is no separate `label` field - the
+   * institution id IS the label, so there is one source of truth for the string.
+   */
+  institution: { id: string } | null;
 }
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
@@ -40,12 +51,31 @@ export const getFleetAddresses = async (
   return [...new Set<Address>([...active, ...EXTRA_FLEETS[chainId]])];
 };
 
-export const getPositionsForChain = async (
+/**
+ * An institution's fleets. EXTRA_FLEETS is deliberately NOT merged in: it is a public-path
+ * escape hatch keyed by chainId, and a public fleet address must never surface as an
+ * institutional position (it would get the wrong label and the wrong exit route).
+ */
+const getInstitutionFleetAddresses = async (
+  institution: Institution,
+): Promise<Address[]> => {
+  const client = getPublicClient(institution.chainId);
+  const active = await client.readContract({
+    address: institution.harborCommand,
+    abi: harborCommandAbi,
+    functionName: "getActiveFleetCommanders",
+  });
+
+  return [...new Set<Address>(active)];
+};
+
+const readFleetPositions = async (
   chainId: number,
   user: Address,
+  fleets: Address[],
+  institution: { id: string } | null,
 ): Promise<FleetPosition[]> => {
   const client = getPublicClient(chainId);
-  const fleets = await getFleetAddresses(chainId);
 
   if (fleets.length === 0) return [];
 
@@ -199,7 +229,7 @@ export const getPositionsForChain = async (
   let assetMetadataCursor = 0;
 
   return candidates
-    .map((entry, index) => {
+    .map((entry, index): FleetPosition | null => {
       const metadataBase = index * 4;
       const nameResult = metadata[metadataBase];
       const assetAddress = assetAddresses[index];
@@ -230,7 +260,9 @@ export const getPositionsForChain = async (
         chainId,
         fleetAddress: entry.fleet,
         fleetName,
-        displayName: humanizeFleetName(chainId, fleetName),
+        displayName: institution
+          ? institutionDisplayName(institution.id, symbolResult.result as string)
+          : humanizeFleetName(chainId, fleetName),
         asset: {
           address: assetAddress,
           symbol: symbolResult.result as string,
@@ -249,26 +281,64 @@ export const getPositionsForChain = async (
           pausedResult.status === "success"
             ? (pausedResult.result as boolean)
             : false,
+        institution,
       };
     })
     .filter((position): position is FleetPosition => position !== null);
 };
 
-/** All chains in parallel; a failing RPC never hides the other chains' positions. */
+export const getPositionsForChain = async (
+  chainId: number,
+  user: Address,
+): Promise<FleetPosition[]> =>
+  readFleetPositions(chainId, user, await getFleetAddresses(chainId), null);
+
+export const getInstitutionPositions = async (
+  institution: Institution,
+  user: Address,
+): Promise<FleetPosition[]> =>
+  readFleetPositions(
+    institution.chainId,
+    user,
+    await getInstitutionFleetAddresses(institution),
+    { id: institution.id },
+  );
+
+/**
+ * All public chains and all institutions in parallel; one failing RPC or HarborCommand never
+ * hides the others' positions.
+ */
 export const getAllPositions = async (
   user: Address,
 ): Promise<{ positions: FleetPosition[]; failedChainIds: number[] }> => {
-  const results = await Promise.allSettled(
-    SUPPORTED_CHAIN_IDS.map((chainId) => getPositionsForChain(chainId, user)),
-  );
+  const tasks: { chainId: number; run: () => Promise<FleetPosition[]> }[] = [
+    ...SUPPORTED_CHAIN_IDS.map((chainId) => ({
+      chainId,
+      run: () => getPositionsForChain(chainId, user),
+    })),
+    ...INSTITUTIONS.map((institution) => ({
+      chainId: institution.chainId,
+      run: () => getInstitutionPositions(institution, user),
+    })),
+  ];
+
+  const results = await Promise.allSettled(tasks.map((task) => task.run()));
 
   const positions: FleetPosition[] = [];
-  const failedChainIds: number[] = [];
+  // A Set because an institution and its chain's public path share a chainId: if only the
+  // institution's read failed the banner still names the chain. Over-warning is the correct bias
+  // for a wind-down app - silently omitting an exitable position is not.
+  const failedChainIds = new Set<number>();
 
   results.forEach((result, index) => {
     if (result.status === "fulfilled") positions.push(...result.value);
-    else failedChainIds.push(SUPPORTED_CHAIN_IDS[index]);
+    else failedChainIds.add(tasks[index].chainId);
   });
 
-  return { positions, failedChainIds };
+  // Applied once, across every chain and institution, so a label collision that spans two
+  // readFleetPositions calls is still caught.
+  return {
+    positions: disambiguateInstitutionNames(positions),
+    failedChainIds: [...failedChainIds],
+  };
 };

@@ -33,6 +33,9 @@ export const PositionCard: FC<PositionCardProps> = ({ position, usdValue, onExit
               {position.displayName || position.fleetName}
             </Text>
             {position.paused ? <span className={classNames.pausedTag}>PAUSED</span> : null}
+            {position.institution ? (
+              <span className={classNames.institutionalTag}>INSTITUTIONAL</span>
+            ) : null}
           </div>
           {position.stakedShares > 0n ? (
             <Text as="p" variant="p3" style={{ color: 'var(--earn-protocol-secondary-60)' }}>

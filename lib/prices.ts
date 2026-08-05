@@ -12,10 +12,12 @@ export interface UsdPrices {
   usdt: number | null;
 }
 
-// Every symbol actually used as a fleet input asset, across all chains (see
-// scripts/list-vault-assets.ts run 2026-07-21). USD₮0 (Arbitrum/Hyperliquid Tether) has no feed
-// of its own and rides the USDT/USD feed - it's Tether's own asset, just deployed under a
-// different symbol.
+// Every symbol actually used as a fleet input asset. Public fleets were confirmed by a one-time
+// scan (that script has since been removed from the repo); institutional fleets were not part of
+// that scan, but every one deployed so far uses USDC, so this list still covers everything the
+// app can surface. Revisit if an institutional fleet ever launches on a different asset. USD₮0
+// (Arbitrum/Hyperliquid Tether) has no feed of its own and rides the USDT/USD feed - it's
+// Tether's own asset, just deployed under a different symbol.
 const USDC_SYMBOLS = new Set(["USDC"]);
 const USDT_SYMBOLS = new Set(["USDT", "USD₮0"]);
 const ETH_SYMBOLS = new Set(["ETH", "WETH"]);

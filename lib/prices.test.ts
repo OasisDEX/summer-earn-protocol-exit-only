@@ -20,6 +20,7 @@ const positionWith = (
   totalAssets,
   stakingRewardsManager: null,
   paused: false,
+  institution: null,
 })
 
 const prices: UsdPrices = { eth: 2000, eur: 1.1, usdc: 0.9998, usdt: 0.999 }

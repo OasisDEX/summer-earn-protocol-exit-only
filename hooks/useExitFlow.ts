@@ -40,8 +40,10 @@ export const useExitFlow = (position: FleetPosition | null, user?: Address) => {
         setPaused(context.paused);
         const plan = buildExitPlan({
           position,
+          user,
           allowance: context.allowance,
           hasClaimableRewards: context.hasClaimableRewards,
+          maxRedeem: context.maxRedeem,
         });
 
         setSteps(plan);

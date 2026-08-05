@@ -1,13 +1,28 @@
 # Summer.fi Exit App
 
-A simple, self-contained web app that lets Summer.fi depositors **withdraw their funds**,
-**unstake their SUMR**, and **stake SUMR with no lock-up** during the protocol wind-down. Connect a wallet, see your positions, exit.
+A simple, self-contained web app that lets Summer.fi depositors **withdraw their funds** from
+both public and institutional vaults, **unstake their SUMR**, and **stake SUMR with no
+lock-up** during the protocol wind-down. Connect a wallet, see your positions, exit.
 
 It talks directly to the blockchain — there is no backend, no database, and no account to create.
 The whole app builds into a folder of static files you can host anywhere.
 
 - **Supported chains:** Ethereum, Base, Arbitrum, Sonic, Hyperliquid
 - **Works out of the box** — no configuration or API keys required
+- **Institutional vaults:** your positions in the per-institution deployments (Targen, Avantgarde,
+  and the ExtDemoCorp demo clients) are listed alongside public ones, and you withdraw them in a
+  single transaction.
+
+## A note for institutional depositors
+
+Institutional vaults exit by redeeming your vault shares directly from the vault contract —
+one transaction, no token approval needed.
+
+Some institutional vaults are wrapped in a **rounds** mechanism, where a withdrawal is a
+request that a curator settles later and you claim afterwards. This app covers shares held
+**in the vault itself**. If your funds are currently sitting in an unclaimed round receipt
+rather than in vault shares, they will not show up here — contact your institution's
+administrator to complete that redemption.
 
 ---
 

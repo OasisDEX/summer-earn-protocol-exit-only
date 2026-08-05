@@ -44,6 +44,11 @@ export const ExitModal: FC<ExitModalProps> = ({
   const onWrongChain =
     position !== null && connectedChainId !== position.chainId;
 
+  // Structural check, not a string-match on the label: a capped institutional redeem leaves
+  // money behind in the vault, so the completion message must say so instead of claiming a full
+  // exit.
+  const capped = flow.steps.some((step) => step.capped);
+
   // Automatic seamless refresh: on success (whole flow done) refetch immediately; on a failure
   // after something already executed, refetch too (state may have partially changed). No reload.
   useEffect(() => {
@@ -87,6 +92,24 @@ export const ExitModal: FC<ExitModalProps> = ({
             <Text as="p" variant="p2">
               This vault is currently paused on-chain and withdrawals will fail.
               Please try again later.
+            </Text>
+          </Card>
+        ) : null}
+
+        {!flow.loading && !flow.paused && !flow.errorMessage && flow.steps.length === 0 ? (
+          <Card variant="cardPrimary">
+            <Text as="p" variant="p2">
+              Your balance is safe - nothing has been withdrawn and nothing has been lost.
+            </Text>
+            <Text
+              as="p"
+              variant="p3"
+              style={{ color: "var(--earn-protocol-secondary-60)" }}
+            >
+              This vault settles withdrawals in rounds that a curator processes periodically,
+              rather than instantly, and none are open for direct redemption right now - that may
+              not change. For vaults like this, your institution&apos;s administrator completes
+              the withdrawal for you, so please get in touch with them.
             </Text>
           </Card>
         ) : null}
@@ -195,7 +218,9 @@ export const ExitModal: FC<ExitModalProps> = ({
               variant="p2"
               style={{ color: "var(--earn-protocol-success-100)" }}
             >
-              All done - your {position?.asset.symbol} is back in your wallet.
+              {capped
+                ? `Part of your ${position?.asset.symbol} is back in your wallet. The vault couldn't release the rest just now - retrying later usually works.`
+                : `All done - your ${position?.asset.symbol} is back in your wallet.`}
             </Text>
             <Text
               as="p"
