@@ -13,6 +13,7 @@ jobs:
   release:
     name: Build app and publish to S3
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
