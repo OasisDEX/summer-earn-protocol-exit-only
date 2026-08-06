@@ -49,6 +49,12 @@
   display: flex;
 }
 
+.heroSubcopy {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 .heroCta {
   margin-top: 64px;
   display: flex;

@@ -50,23 +50,36 @@ export default function LandingPage() {
           <Text as="h3" variant="h3">
             Summer.fi is winding down.
           </Text>
-          <Text
-            as="p"
-            variant="p1"
-            style={{
-              textShadow: "1px 1px 0 rgba(0,0,0,0.2)",
-            }}
-          >
-            Read more on the{" "}
-            <Link
-              href="https://blog.summer.fi/sunsetting-summer-fi-and-the-labs-company/"
-              className={styles.blogLink}
-              target="_blank"
+          <div className={styles.heroSubcopy}>
+            <Text
+              as="p"
+              variant="p1"
+              style={{
+                textShadow: "1px 1px 0 rgba(0,0,0,0.2)",
+              }}
             >
-              blog post
-            </Link>
-            .
-          </Text>
+              The Summer.fi app has now been deactivated.
+            </Text>
+            <Text
+              as="p"
+              variant="p1"
+              style={{
+                textShadow: "1px 1px 0 rgba(0,0,0,0.2)",
+              }}
+            >
+              While the Lazy Summer Protocol is currently in withdraw only mode,
+              you can use this app to exit all your positions and claim any
+              outstanding rewards. Read more on the{" "}
+              <Link
+                href="https://blog.summer.fi/sunsetting-summer-fi-and-the-labs-company/"
+                className={styles.blogLink}
+                target="_blank"
+              >
+                blog post
+              </Link>
+              .
+            </Text>
+          </div>
           <div className={styles.heroCta}>
             <ConnectButton />
             <Text as="p" variant="p4">
