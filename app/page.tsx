@@ -82,6 +82,31 @@ export default function LandingPage() {
           >
             Summer.fi 2026
           </Text>
+          <Text
+            as="span"
+            variant="p3"
+            style={{ color: "var(--earn-protocol-secondary-40)" }}
+          >
+            |
+          </Text>
+          <Link href="/privacy">
+            <Text
+              as="span"
+              variant="p3"
+              style={{ color: "var(--earn-protocol-secondary-60)" }}
+            >
+              Privacy Policy
+            </Text>
+          </Link>
+          <Link href="/terms">
+            <Text
+              as="span"
+              variant="p3"
+              style={{ color: "var(--earn-protocol-secondary-60)" }}
+            >
+              Terms of Service
+            </Text>
+          </Link>
         </div>
       </section>
     </div>

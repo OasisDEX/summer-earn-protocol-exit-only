@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { Text } from "@/components/ui";
 
 export const FooterWrapper = () => {
@@ -20,6 +22,31 @@ export const FooterWrapper = () => {
       >
         Thanks for everything - Summer.fi
       </Text>
+      <Text
+        as="span"
+        variant="p3"
+        style={{ color: "var(--earn-protocol-secondary-40)" }}
+      >
+        |
+      </Text>
+      <Link href="/privacy">
+        <Text
+          as="span"
+          variant="p3"
+          style={{ color: "var(--earn-protocol-secondary-60)" }}
+        >
+          Privacy Policy
+        </Text>
+      </Link>
+      <Link href="/terms">
+        <Text
+          as="span"
+          variant="p3"
+          style={{ color: "var(--earn-protocol-secondary-60)" }}
+        >
+          Terms of Service
+        </Text>
+      </Link>
     </footer>
   );
 };
