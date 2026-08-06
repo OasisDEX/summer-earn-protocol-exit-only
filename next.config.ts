@@ -4,6 +4,9 @@ const nextConfig: NextConfig = {
   devIndicators: { position: "bottom-right" },
   // Fully static export - the deployed artifact is the out/ directory.
   output: "export",
+  // S3 can't map /terms → terms.html. With trailingSlash, each route exports as
+  // <route>/index.html, which S3 website hosting resolves natively.
+  trailingSlash: true,
   reactStrictMode: false,
   images: { unoptimized: true },
   // Merkl's API rejects plain-http localhost origins (no Access-Control-Allow-Origin),
