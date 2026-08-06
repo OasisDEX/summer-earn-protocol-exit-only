@@ -58,7 +58,11 @@ export default function LandingPage() {
             }}
           >
             Read more on the{" "}
-            <Link href="#" className={styles.blogLink}>
+            <Link
+              href="https://blog.summer.fi/sunsetting-summer-fi-and-the-labs-company/"
+              className={styles.blogLink}
+              target="_blank"
+            >
               blog post
             </Link>
             .
