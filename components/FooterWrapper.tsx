@@ -38,6 +38,13 @@ export const FooterWrapper = () => {
           Privacy Policy
         </Text>
       </Link>
+      <Text
+        as="span"
+        variant="p3"
+        style={{ color: "var(--earn-protocol-secondary-40)" }}
+      >
+        |
+      </Text>
       <Link href="/terms">
         <Text
           as="span"
